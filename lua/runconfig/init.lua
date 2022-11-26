@@ -12,15 +12,15 @@ local M = {}
 
 -------------------- OPTIONS -------------------------------
 local options = {
-  buildfile = '.buildme.sh',  -- the build file to execute
-  interpreter = 'bash',       -- the interpreter to use (bash, python, ...)
-  force = '--force',          -- the option to pass when the bang is used
-  wincmd = '',                -- a window command to run prior to a build job
+	buildfile = '.buildme.sh', -- the build file to execute
+	interpreter = 'bash', -- the interpreter to use (bash, python, ...)
+	force = '--force', -- the option to pass when the bang is used
+	wincmd = '', -- a window command to run prior to a build job
 }
 
 -------------------- PRIVATE -------------------------------
 local function buffer_exists()
-  return job_buffer and fn.buflisted(job_buffer) == 1
+	return job_buffer and fn.buflisted(job_buffer) == 1
 end
 
 local function move_to_buffer()
@@ -28,7 +28,7 @@ local function move_to_buffer()
 		job_buffer = api.nvim_create_buf(true, true)
 	end
 	if not win or not api.nvim_get_current_win() == win then
-		prev_win = api.nvim_get_current_win()
+		Prev_win = api.nvim_get_current_win()
 	end
 	if not win or not api.nvim_win_is_valid(win) then
 		api.nvim_exec('below 10sp', true)
@@ -46,34 +46,54 @@ local function autoscroll()
 end
 
 local function return_to_prev_win()
-	if prev_win and api.nvim_win_is_valid(prev_win) then
-		api.nvim_set_current_win(prev_win)
+	if Prev_win and api.nvim_win_is_valid(Prev_win) then
+		api.nvim_set_current_win(Prev_win)
 	end
 end
 
-
 -------------------- PUBLIC --------------------------------
-function M.run(config_name, config_file)
-	configs = require(config_file)
-	config = configs[config_name]
-	local cmd = config.cmd
-	env = config.env
-	opts = {
+function M.run(config_name, config_file, args)
+	local configs = require(config_file)
+	local config = configs[config_name]
+	local command = config.cmd
+	if type(command) == "function" then
+		command = command(unpack(args))
+	end
+	local env = config.env
+	local function on_exit()
+		package.loaded[config_file] = nil
+		return_to_prev_win()
+	end
+
+	local opts = {
 		clear_env = true,
 		env = env,
-		on_exit = return_to_prev_win,
+		on_exit = on_exit,
 	}
 	move_to_buffer()
 	-- Start build job
 	if job_id then
-		local temp_prev_win = prev_win
-		prev_win = win
+		local temp_prev_win = Prev_win
+		Prev_win = win
 		fn.jobstop(job_id)
-		prev_win = temp_prev_win
+		Prev_win = temp_prev_win
 	end
-	job_id = fn.termopen(table.concat(cmd, " && "), opts)
+	job_id = fn.termopen(table.concat(command, " && "), opts)
 	api.nvim_buf_set_name(job_buffer, config_name .. " (RunConfig)")
 	autoscroll()
+end
+
+function M.complete(input)
+	local config_file = "runconfigs"
+	local configs = require(config_file)
+	local config_names = {}
+
+	for k, _ in pairs(configs) do
+		if k:find(input, 1, true) == 1 then
+			table.insert(config_names, k)
+		end
+	end
+	return config_names
 end
 
 ------------------------------------------------------------
