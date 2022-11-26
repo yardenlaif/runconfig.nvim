@@ -19,6 +19,11 @@ api.nvim_create_user_command('RunConfig', function(info)
 	require("runconfig").run(config_name, config_file, argTab)
 end, {
 	desc = 'Run a configuration',
-	nargs = '?',
+	nargs = '+',
 	complete = require("runconfig").complete,
+})
+api.nvim_create_user_command('RerunConfig', function()
+	require("runconfig").rerun()
+end, {
+	desc = 'Rerun previous configuration',
 })

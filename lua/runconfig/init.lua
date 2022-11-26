@@ -1,4 +1,4 @@
--- nvim-runconfig
+-- runconfig.nvim
 -- By Yarden Laifenfeld
 -- github.com/yardenlaif
 -- @yardenlaif
@@ -8,6 +8,7 @@ local api, cmd, fn, vim = vim.api, vim.cmd, vim.fn, vim
 local fmt = string.format
 local nkeys = api.nvim_replace_termcodes('<C-\\><C-n>G', true, false, true)
 local job_buffer, job_id
+local Prev_win, Win, Prev_config, Prev_args
 local M = {}
 
 -------------------- OPTIONS -------------------------------
@@ -27,16 +28,16 @@ local function move_to_buffer()
 	if not buffer_exists() then
 		job_buffer = api.nvim_create_buf(true, true)
 	end
-	if not win or not api.nvim_get_current_win() == win then
+	if not Win or not api.nvim_get_current_win() == Win then
 		Prev_win = api.nvim_get_current_win()
 	end
-	if not win or not api.nvim_win_is_valid(win) then
+	if not Win or not api.nvim_win_is_valid(Win) then
 		api.nvim_exec('below 10sp', true)
-		win = vim.api.nvim_get_current_win()
+		Win = vim.api.nvim_get_current_win()
 	else
-		vim.api.nvim_set_current_win(win)
+		vim.api.nvim_set_current_win(Win)
 	end
-	vim.api.nvim_win_set_buf(win, job_buffer)
+	vim.api.nvim_win_set_buf(Win, job_buffer)
 	api.nvim_buf_set_option(job_buffer, 'filetype', 'term')
 	api.nvim_buf_set_option(job_buffer, 'modified', false)
 end
@@ -53,6 +54,8 @@ end
 
 -------------------- PUBLIC --------------------------------
 function M.run(config_name, config_file, args)
+	Prev_config = config_name
+	Prev_args = args
 	local configs = require(config_file)
 	local config = configs[config_name]
 	local command = config.cmd
@@ -74,13 +77,17 @@ function M.run(config_name, config_file, args)
 	-- Start build job
 	if job_id then
 		local temp_prev_win = Prev_win
-		Prev_win = win
+		Prev_win = Win
 		fn.jobstop(job_id)
 		Prev_win = temp_prev_win
 	end
 	job_id = fn.termopen(table.concat(command, " && "), opts)
 	api.nvim_buf_set_name(job_buffer, config_name .. " (RunConfig)")
 	autoscroll()
+end
+
+function M.rerun()
+	M.run(Prev_config, "runconfigs", Prev_args)
 end
 
 function M.complete(input)
